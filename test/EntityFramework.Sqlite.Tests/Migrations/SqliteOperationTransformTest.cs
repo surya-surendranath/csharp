@@ -1,6 +1,8 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using System;
+using Microsoft.Data.Entity.Migrations.Builders;
 using Microsoft.Data.Entity.Migrations.Infrastructure;
 using Microsoft.Data.Entity.Sqlite.Metadata;
 using Microsoft.Data.Entity.Sqlite.Migrations.Operations;
@@ -10,6 +12,72 @@ namespace Microsoft.Data.Entity.Sqlite.Migrations
 {
     public class SqliteOperationTransformTest : SqliteOperationTransformBase
     {
+        [Fact]
+        public void AlterColumn_to_TableRebuild()
+        {
+            SimpleRebuildTest(migrate => { migrate.AlterColumn("ZipCode", "Address", "TEXT"); });
+        }
+
+        [Fact]
+        public void AddPrimaryKey_to_TableRebuild()
+        {
+            SimpleRebuildTest(migrate => { migrate.AddPrimaryKey("PK_Address", "Address", new []{"Id"}); });
+        }
+
+        [Fact]
+        public void DropColumn_to_TableRebuild()
+        {
+            SimpleRebuildTest(migrate=> migrate.DropColumn("HouseNumber","Address"));
+        }
+
+        [Fact]
+        public void DropPrimaryKey_to_TableRebuild()
+        {
+            SimpleRebuildTest(migrate => { migrate.DropPrimaryKey("PK_Address", "Address"); });
+        }
+
+        [Fact]
+        public void AddForeignKey_to_TableRebuild()
+        {
+            SimpleRebuildTest(migrate => { migrate.AddForeignKey("FK_Contact", "Address", new []{"Contact_Id"}, "Contacts"); });
+        }
+
+        [Fact]
+        public void DropForeignKey_to_TableRebuild()
+        {
+            SimpleRebuildTest(migrate => { migrate.DropForeignKey("FK_Owner", "Address"); });
+        }
+
+        private void SimpleRebuildTest(Action<MigrationBuilder> migration)
+        {
+            var t = "Address";
+            var operations = Transform(migration, model =>
+                {
+                    model.Entity("Contacts", b =>
+                        {
+                            b.Property<int>("Id");
+                            b.Key("Id");
+                        });
+                    model.Entity(t, b =>
+                        {
+                            b.Property<string>("ZipCode").Required();
+                            b.Property<int>("Contact_Id");
+                            b.Property<int>("Id");
+                            b.Reference("Contacts").InverseCollection().ForeignKey("Contact_Id");
+                            b.Key("Id");
+                        });
+                });
+
+            var steps = Assert.IsType<TableRebuildOperation>(operations[0]);
+
+            var columns = new[] { "Id", "Contact_Id", "ZipCode" };
+            Assert.Collection(steps.Operations,
+                AssertRenameTemp(t),
+                AssertCreateTable(t, columns),
+                AssertMoveData(t, columns, columns),
+                AssertDropTemp(t));
+        }
+
         [Fact]
         public void RenameColumn_to_TableRebuild()
         {
@@ -63,26 +131,6 @@ namespace Microsoft.Data.Entity.Sqlite.Migrations
                 AssertMoveData(t, new[] { "Key", "Altered", "Indexed" }, new[] { "Key", "Altered", "Indexed" }),
                 AssertDropTemp(t),
                 AssertCreateIndex(t, new[] { "Indexed" }, unique: true));
-        }
-
-        [Fact]
-        public void DropColumn_to_TableRebuild()
-        {
-            var operations = Transform(migrate => { migrate.DropColumn("OldCol", "A"); }, model =>
-                {
-                    model.Entity("A", b =>
-                        {
-                            b.Property<string>("Col");
-                            b.Key("Col");
-                        });
-                });
-
-            var steps = Assert.IsType<TableRebuildOperation>(operations[0]);
-            Assert.Collection(steps.Operations,
-                AssertRenameTemp("A"),
-                AssertCreateTable("A", new[] { "Col" }, new[] { "Col" }),
-                AssertMoveData("A", new[] { "Col" }, new[] { "Col" }),
-                AssertDropTemp("A"));
         }
 
         protected override SqliteOperationTransformer CreateTransformer()

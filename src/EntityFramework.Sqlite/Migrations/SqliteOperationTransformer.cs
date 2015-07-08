@@ -14,6 +14,8 @@ namespace Microsoft.Data.Entity.Sqlite.Migrations
 {
     public class SqliteOperationTransformer
     {
+        // TODO detect current schema and optimize based on existing table structure, not just the target model
+
         private readonly IModelDiffer _differ;
         private readonly IDictionary<string, TableRebuildOperation> _tableRebuilds = new Dictionary<string, TableRebuildOperation>();
 
@@ -42,7 +44,11 @@ namespace Microsoft.Data.Entity.Sqlite.Migrations
         }
 
         private IList<MigrationOperation> TransformOperation(AlterColumnOperation operation, IModel model)
-            => FilterRedudantOperation(operation.Table, operation);
+        {
+            // Because of loose typing in SQLite, it may be possible to skip rebuilds for certain types of alters.
+            GetOrAddRebuild(operation.Table, model);
+            return null;
+        }
 
         private IList<MigrationOperation> TransformOperation(AddColumnOperation operation, IModel model)
         {
@@ -61,7 +67,28 @@ namespace Microsoft.Data.Entity.Sqlite.Migrations
         }
 
         private IList<MigrationOperation> TransformOperation(AddPrimaryKeyOperation operation, IModel model)
-            => FilterRedudantOperation(operation.Table, operation);
+        {
+            GetOrAddRebuild(operation.Table, model);
+            return null;
+        }
+
+        private IList<MigrationOperation> TransformOperation(DropPrimaryKeyOperation operation, IModel model)
+        {
+            GetOrAddRebuild(operation.Table, model);
+            return null;
+        }
+
+        private IList<MigrationOperation> TransformOperation(AddForeignKeyOperation operation, IModel model)
+        {
+            GetOrAddRebuild(operation.Table, model);
+            return null;
+        }
+
+        private IList<MigrationOperation> TransformOperation(DropForeignKeyOperation operation, IModel model)
+        {
+            GetOrAddRebuild(operation.Table, model);
+            return null;
+        }
 
         private IList<MigrationOperation> TransformOperation(CreateIndexOperation operation, IModel model)
             => FilterRedudantOperation(operation.Table, operation);
@@ -92,7 +119,7 @@ namespace Microsoft.Data.Entity.Sqlite.Migrations
             var differences = _differ.GetDifferences(null, model);
             var createTableOperation = differences
                 .OfType<CreateTableOperation>()
-                .FirstOrDefault(o => o.Name == tableName);
+                .First(o => o.Name == tableName);
 
             var rebuild = new TableRebuildOperation
             {
