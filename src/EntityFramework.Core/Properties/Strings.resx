@@ -496,7 +496,7 @@
     <value>The navigation property '{navigation}' cannot be removed because it is still referenced from entity type '{entityType}'.</value>
   </data>
   <data name="IntraHierarchicalAmbiguousNavigation" xml:space="preserve">
-    <value>The navigation property corresponding to '{entityType}' cannot be determined because the specified foreign key {foreignKey} references an entity type that it is in the same hierarchy as the entity type that it is declared on.</value>
+    <value>The navigation property corresponding to '{entityType}' cannot be determined because the principal entity type for foreign key {foreignKey} is '{principalEntityType}' and it is in the same hierarchy as the dependent entity type '{dependentEntityType}'.</value>
   </data>
   <data name="DuplicateNavigationsOnBase" xml:space="preserve">
     <value>The type '{entityType}' cannot have base type '{baseType}' because both types include the navigations: {navigations}.</value>
@@ -536,5 +536,8 @@
   </data>
   <data name="SelfReferencingNavigationWithInverseProperty" xml:space="preserve">
     <value>A relationship cannot be established from property '{property}' on type '{entityType}' to property '{referencedProperty}' on type '{referencedEntityType}'. Check the values in the InversePropertyAttribute to ensure relationship definitions are unique and reference from one navigation property to its corresponding inverse navigation property.</value>
+  </data>
+  <data name="ImmutableModel" xml:space="preserve">
+    <value>The requested value cannot be changed because the specified model is read-only.</value>
   </data>
 </root>

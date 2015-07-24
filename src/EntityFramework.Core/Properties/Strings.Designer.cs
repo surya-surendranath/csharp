@@ -1021,11 +1021,11 @@ namespace Microsoft.Data.Entity.Internal
         }
 
         /// <summary>
-        /// The navigation property corresponding to '{entityType}' cannot be determined because the specified foreign key {foreignKey} references an entity type that it is in the same hierarchy as the entity type that it is declared on.
+        /// The navigation property corresponding to '{entityType}' cannot be determined because the principal entity type for foreign key {foreignKey} is '{principalEntityType}' and it is in the same hierarchy as the dependent entity type '{dependentEntityType}'.
         /// </summary>
-        public static string IntraHierarchicalAmbiguousNavigation([CanBeNull] object entityType, [CanBeNull] object foreignKey)
+        public static string IntraHierarchicalAmbiguousNavigation([CanBeNull] object entityType, [CanBeNull] object foreignKey, [CanBeNull] object principalEntityType, [CanBeNull] object dependentEntityType)
         {
-            return string.Format(CultureInfo.CurrentCulture, GetString("IntraHierarchicalAmbiguousNavigation", "entityType", "foreignKey"), entityType, foreignKey);
+            return string.Format(CultureInfo.CurrentCulture, GetString("IntraHierarchicalAmbiguousNavigation", "entityType", "foreignKey", "principalEntityType", "dependentEntityType"), entityType, foreignKey, principalEntityType, dependentEntityType);
         }
 
         /// <summary>
@@ -1130,6 +1130,14 @@ namespace Microsoft.Data.Entity.Internal
         public static string SelfReferencingNavigationWithInverseProperty([CanBeNull] object property, [CanBeNull] object entityType, [CanBeNull] object referencedProperty, [CanBeNull] object referencedEntityType)
         {
             return string.Format(CultureInfo.CurrentCulture, GetString("SelfReferencingNavigationWithInverseProperty", "property", "entityType", "referencedProperty", "referencedEntityType"), property, entityType, referencedProperty, referencedEntityType);
+        }
+
+        /// <summary>
+        /// The requested value cannot be changed because the specified model is read-only.
+        /// </summary>
+        public static string ImmutableModel
+        {
+            get { return GetString("ImmutableModel"); }
         }
 
         private static string GetString(string name, params string[] formatterNames)

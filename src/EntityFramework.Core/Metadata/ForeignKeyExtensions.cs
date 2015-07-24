@@ -76,6 +76,13 @@ namespace Microsoft.Data.Entity.Metadata
             return foreignKey.DeclaringEntityType == foreignKey.PrincipalEntityType;
         }
 
+        public static bool IsSelfReferencing([NotNull] this ForeignKey foreignKey)
+        {
+            Check.NotNull(foreignKey, nameof(foreignKey));
+
+            return foreignKey.DeclaringEntityType == foreignKey.PrincipalEntityType;
+        }
+
         public static bool IsIntraHierarchical([NotNull] this IForeignKey foreignKey)
         {
             Check.NotNull(foreignKey, nameof(foreignKey));
@@ -105,7 +112,7 @@ namespace Microsoft.Data.Entity.Metadata
 
             if (foreignKey.IsIntraHierarchical())
             {
-                throw new InvalidOperationException(Strings.IntraHierarchicalAmbiguousNavigation(entityType.Name, Property.Format(foreignKey.Properties)));
+                throw new InvalidOperationException(Strings.IntraHierarchicalAmbiguousNavigation(entityType.Name, Property.Format(foreignKey.Properties), foreignKey.PrincipalEntityType, foreignKey.DeclaringEntityType));
             }
 
             return foreignKey.DeclaringEntityType.IsAssignableFrom(entityType)
@@ -130,7 +137,7 @@ namespace Microsoft.Data.Entity.Metadata
 
             if (foreignKey.IsIntraHierarchical())
             {
-                throw new InvalidOperationException(Strings.IntraHierarchicalAmbiguousNavigation(entityType.Name, Property.Format(foreignKey.Properties)));
+                throw new InvalidOperationException(Strings.IntraHierarchicalAmbiguousNavigation(entityType.Name, Property.Format(foreignKey.Properties), foreignKey.PrincipalEntityType, foreignKey.DeclaringEntityType));
             }
 
             return foreignKey.DeclaringEntityType.IsAssignableFrom(entityType)
