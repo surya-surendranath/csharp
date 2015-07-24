@@ -213,16 +213,16 @@ namespace Microsoft.Data.Entity.Query.ExpressionVisitors
                     });
             }
 
-            Func<ISqlQueryGenerator> sqlQueryGeneratorFactory;
+            Func<IQueryCommandGenerator> queryCommandGeneratorFactory;
 
             if (composable)
             {
-                sqlQueryGeneratorFactory = () =>
-                    relationalQueryCompilationContext.CreateSqlQueryGenerator(selectExpression);
+                queryCommandGeneratorFactory = () =>
+                    relationalQueryCompilationContext.CreateQueryCommandGenerator(selectExpression);
             }
             else
             {
-                sqlQueryGeneratorFactory = () =>
+                queryCommandGeneratorFactory = () =>
                     new RawSqlQueryGenerator(selectExpression, sqlString, sqlParameters, relationalQueryCompilationContext.TypeMapper);
             }
 
@@ -232,7 +232,7 @@ namespace Microsoft.Data.Entity.Query.ExpressionVisitors
                 EntityQueryModelVisitor.QueryContextParameter,
                 Expression.Constant(
                     new CommandBuilder(
-                        sqlQueryGeneratorFactory,
+                        queryCommandGeneratorFactory,
                         relationalQueryCompilationContext.ValueBufferFactoryFactory)),
                 Expression.Lambda(
                     Expression.Call(queryMethodInfo, queryMethodArguments),

@@ -5,6 +5,7 @@ using System;
 using Microsoft.Data.Entity.Infrastructure;
 using Microsoft.Data.Entity.Metadata;
 using Microsoft.Data.Entity.Storage;
+using Microsoft.Data.Entity.Storage.Commands;
 using Microsoft.Data.Entity.Update;
 using Moq;
 using Xunit;

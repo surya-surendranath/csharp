@@ -32,13 +32,13 @@ namespace Microsoft.Data.Entity.Sqlite.Query
             if (selectExpression.Limit != null
                 || selectExpression.Offset != null)
             {
-                Sql.AppendLine()
+                CommandBuilder.AppendLine()
                     .Append("LIMIT ")
                     .Append(selectExpression.Limit ?? -1);
 
                 if (selectExpression.Offset != null)
                 {
-                    Sql.Append(" OFFSET ")
+                    CommandBuilder.Append(" OFFSET ")
                         .Append(selectExpression.Offset);
                 }
             }

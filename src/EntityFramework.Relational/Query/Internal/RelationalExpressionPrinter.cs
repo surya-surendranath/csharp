@@ -34,11 +34,11 @@ namespace Microsoft.Data.Entity.Query.Internal
                     stringBuilder.AppendLine("SelectExpression: ");
                     stringBuilder.IncrementIndent();
 
-                    var sqlGenerator = commandBuilder.SqlGeneratorFactory();
-                    var defaultQuerySqlGenerator = sqlGenerator as DefaultQuerySqlGenerator;
+                    var commandGenerator = commandBuilder.CommandGeneratorFactory();
+                    var defaultQuerySqlGenerator = commandGenerator as DefaultQuerySqlGenerator;
                     var selectExpression = defaultQuerySqlGenerator != null
                         ? defaultQuerySqlGenerator.SelectExpression
-                        : ((RawSqlQueryGenerator)sqlGenerator).SelectExpression;
+                        : ((RawSqlQueryGenerator)commandGenerator).SelectExpression;
 
                     var sql = selectExpression.ToString();
                     var lines = sql.Split(new[] { Environment.NewLine }, StringSplitOptions.None);

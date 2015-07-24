@@ -643,7 +643,7 @@ namespace Microsoft.Data.Entity.Query.Expressions
 
         public override string ToString()
         {
-            return new DefaultQuerySqlGenerator(this, null).GenerateSql(new Dictionary<string, object>());
+            return new DefaultQuerySqlGenerator(this, null).GenerateCommand(new Dictionary<string, object>()).CommandText;
         }
 
         // TODO: Make polymorphic

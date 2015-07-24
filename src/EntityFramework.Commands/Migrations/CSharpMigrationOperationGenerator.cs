@@ -1140,19 +1140,7 @@ namespace Microsoft.Data.Entity.Commands.Migrations
 
             using (builder.Indent())
             {
-                if (operation.SuppressTransaction)
-                {
-                    builder.Append("sql: ");
-                }
-
                 builder.Append(_code.Literal(operation.Sql));
-
-                if (operation.SuppressTransaction)
-                {
-                    builder
-                        .AppendLine(",")
-                        .Append("suppressTransaction: true");
-                }
 
                 builder.Append(")");
 

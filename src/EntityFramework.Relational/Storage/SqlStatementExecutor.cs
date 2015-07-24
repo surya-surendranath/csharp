@@ -7,8 +7,8 @@ using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
-using Microsoft.Data.Entity.Infrastructure;
 using Microsoft.Data.Entity.Internal;
+using Microsoft.Data.Entity.Storage.Commands;
 using Microsoft.Data.Entity.Utilities;
 using Microsoft.Framework.Logging;
 
@@ -27,34 +27,83 @@ namespace Microsoft.Data.Entity.Storage
 
         protected virtual ILogger Logger => _logger.Value;
 
+        public virtual void ExecuteNonQuery(
+            [NotNull] IRelationalConnection connection,
+            [NotNull] RelationalCommand relationalCommand)
+            => ExecuteNonQuery(connection, new[] { relationalCommand });
+
+        public virtual void ExecuteNonQuery(
+            [NotNull] IRelationalConnection connection,
+            [NotNull] IEnumerable<RelationalCommand> relationalCommands)
+        {
+            Check.NotNull(connection, nameof(connection));
+            Check.NotNull(relationalCommands, nameof(relationalCommands));
+
+            Execute<object>(
+                connection,
+                () =>
+                {
+                    foreach (var relationalCommand in relationalCommands)
+                    {
+                        var command = relationalCommand.CreateDbCommand(connection);
+                        Logger.LogCommand(command);
+
+                        command.ExecuteNonQuery();
+                    }
+                    return null;
+                });
+        }
+
         public virtual Task ExecuteNonQueryAsync(
-            IRelationalConnection connection,
-            DbTransaction transaction,
-            IEnumerable<SqlBatch> sqlBatches,
+            [NotNull] IRelationalConnection connection,
+            [NotNull] RelationalCommand relationalCommand,
+            CancellationToken cancellationToken = default(CancellationToken))
+            => ExecuteNonQueryAsync(connection, new[] { relationalCommand }, cancellationToken);
+
+        public virtual Task ExecuteNonQueryAsync(
+            [NotNull] IRelationalConnection connection,
+            [NotNull] IEnumerable<RelationalCommand> relationalCommands,
             CancellationToken cancellationToken = default(CancellationToken))
         {
             Check.NotNull(connection, nameof(connection));
-            Check.NotNull(sqlBatches, nameof(sqlBatches));
+            Check.NotNull(relationalCommands, nameof(relationalCommands));
 
             return ExecuteAsync(
                 connection,
                 async () =>
+                {
+                    foreach (var relationalCommand in relationalCommands)
                     {
-                        foreach (var sqlBatch in sqlBatches)
-                        {
-                            var command = sqlBatch.CreateCommand(connection, transaction);
-                            Logger.LogCommand(command);
+                        var command = relationalCommand.CreateDbCommand(connection);
+                        Logger.LogCommand(command);
 
-                            await command.ExecuteNonQueryAsync(cancellationToken);
-                        }
-                        return Task.FromResult<object>(null);
-                    },
+                        await command.ExecuteNonQueryAsync(cancellationToken);
+                    }
+                    return Task.FromResult<object>(null);
+                },
                 cancellationToken);
+        }
+
+        public virtual object ExecuteScalar(
+            IRelationalConnection connection,
+            string sql)
+        {
+            Check.NotNull(connection, nameof(connection));
+            Check.NotNull(sql, nameof(sql));
+
+            return Execute(
+                connection,
+                () =>
+                {
+                    var command = new RelationalCommand(sql).CreateDbCommand(connection);
+                    Logger.LogCommand(command);
+
+                    return command.ExecuteScalar();
+                });
         }
 
         public virtual Task<object> ExecuteScalarAsync(
             IRelationalConnection connection,
-            DbTransaction transaction,
             string sql,
             CancellationToken cancellationToken = default(CancellationToken))
         {
@@ -65,7 +114,7 @@ namespace Microsoft.Data.Entity.Storage
                 connection,
                 () =>
                     {
-                        var command = new SqlBatch(sql).CreateCommand(connection, transaction);
+                        var command = new RelationalCommand(sql).CreateDbCommand(connection);
                         Logger.LogCommand(command);
 
                         return command.ExecuteScalarAsync(cancellationToken);
@@ -73,10 +122,27 @@ namespace Microsoft.Data.Entity.Storage
                 cancellationToken);
         }
 
+        public virtual DbDataReader ExecuteReader(
+            [NotNull] IRelationalConnection connection,
+            [NotNull] string sql)
+        {
+            Check.NotNull(connection, nameof(connection));
+            Check.NotNull(sql, nameof(sql));
+
+            return Execute(
+                connection,
+                () =>
+                    {
+                        var command = new RelationalCommand(sql).CreateDbCommand(connection);
+                        Logger.LogCommand(command);
+
+                        return command.ExecuteReader();
+                    });
+        }
+
         public virtual Task<DbDataReader> ExecuteReaderAsync(
-            IRelationalConnection connection,
-            DbTransaction transaction,
-            string sql,
+            [NotNull] IRelationalConnection connection,
+            [NotNull] string sql,
             CancellationToken cancellationToken = default(CancellationToken))
         {
             Check.NotNull(connection, nameof(connection));
@@ -85,12 +151,32 @@ namespace Microsoft.Data.Entity.Storage
             return ExecuteAsync(
                 connection,
                 () =>
-                {
-                    var command = new SqlBatch(sql).CreateCommand(connection, transaction);
-                    Logger.LogCommand(command);
+                    {
+                        var command = new RelationalCommand(sql).CreateDbCommand(connection);
+                        Logger.LogCommand(command);
 
-                    return command.ExecuteReaderAsync(cancellationToken);
-                });
+                        return command.ExecuteReaderAsync(cancellationToken);
+                    },
+                cancellationToken);
+        }
+
+        protected virtual T Execute<T>(
+            IRelationalConnection connection,
+            Func<T> action)
+        {
+            Check.NotNull(connection, nameof(connection));
+
+            // TODO Deal with suppressing transactions etc.
+            connection.Open();
+
+            try
+            {
+                return action();
+            }
+            finally
+            {
+                connection.Close();
+            }
         }
 
         protected virtual async Task<T> ExecuteAsync<T>(
@@ -112,84 +198,6 @@ namespace Microsoft.Data.Entity.Storage
             }
         }
 
-        public virtual void ExecuteNonQuery(
-            IRelationalConnection connection,
-            DbTransaction transaction,
-            IEnumerable<SqlBatch> sqlBatches)
-        {
-            Check.NotNull(connection, nameof(connection));
-            Check.NotNull(sqlBatches, nameof(sqlBatches));
 
-            Execute(
-                connection,
-                () =>
-                    {
-                        foreach (var sqlBatch in sqlBatches)
-                        {
-                            var command = sqlBatch.CreateCommand(connection, transaction);
-                            Logger.LogCommand(command);
-
-                            command.ExecuteNonQuery();
-                        }
-                        return default(object);
-                    });
-        }
-
-        public virtual object ExecuteScalar(
-            IRelationalConnection connection,
-            DbTransaction transaction,
-            string sql)
-        {
-            Check.NotNull(connection, nameof(connection));
-            Check.NotNull(sql, nameof(sql));
-
-            return Execute(
-                connection,
-                () =>
-                    {
-                        var command = new SqlBatch(sql).CreateCommand(connection, transaction);
-                        Logger.LogCommand(command);
-
-                        return command.ExecuteScalar();
-                    });
-        }
-
-        public virtual DbDataReader ExecuteReader(
-            IRelationalConnection connection,
-            DbTransaction transaction,
-            string sql)
-        {
-            Check.NotNull(connection, nameof(connection));
-            Check.NotNull(sql, nameof(sql));
-
-            return Execute(
-                connection,
-                () =>
-                {
-                    var command = new SqlBatch(sql).CreateCommand(connection, transaction);
-                    Logger.LogCommand(command);
-
-                    return command.ExecuteReader();
-                });
-        }
-
-        protected virtual T Execute<T>(
-            IRelationalConnection connection,
-            Func<T> action)
-        {
-            Check.NotNull(connection, nameof(connection));
-
-            // TODO Deal with suppressing transactions etc.
-            connection.Open();
-
-            try
-            {
-                return action();
-            }
-            finally
-            {
-                connection.Close();
-            }
-        }
     }
 }

@@ -3,6 +3,7 @@
 
 using Microsoft.Data.Entity.SqlServer.Update;
 using Microsoft.Data.Entity.Storage;
+using Microsoft.Data.Entity.Storage.Commands;
 using Microsoft.Data.Entity.Update;
 using Xunit;
 

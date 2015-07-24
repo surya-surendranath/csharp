@@ -10,16 +10,17 @@ using JetBrains.Annotations;
 using Microsoft.Data.Entity.Query.Expressions;
 using Microsoft.Data.Entity.Relational.Internal;
 using Microsoft.Data.Entity.Storage;
+using Microsoft.Data.Entity.Storage.Commands;
 using Microsoft.Data.Entity.Utilities;
 
 namespace Microsoft.Data.Entity.Query.Sql
 {
-    public class RawSqlQueryGenerator : ISqlQueryGenerator
+    public class RawSqlQueryGenerator : IQueryCommandGenerator
     {
         private readonly SelectExpression _selectExpression;
+        private readonly IRelationalTypeMapper _typeMapper;
         private readonly string _sql;
         private readonly object[] _inputParameters;
-        private readonly List<CommandParameter> _commandParameters;
 
         public RawSqlQueryGenerator(
             [NotNull] SelectExpression selectExpression,
@@ -27,46 +28,24 @@ namespace Microsoft.Data.Entity.Query.Sql
             [NotNull] object[] parameters,
             [NotNull] IRelationalTypeMapper typeMapper)
         {
-            Check.NotNull(typeMapper, nameof(typeMapper));
             Check.NotNull(selectExpression, nameof(selectExpression));
             Check.NotNull(sql, nameof(sql));
             Check.NotNull(parameters, nameof(parameters));
+            Check.NotNull(typeMapper, nameof(typeMapper));
 
             _selectExpression = selectExpression;
             _sql = sql;
             _inputParameters = parameters;
-            _commandParameters = new List<CommandParameter>();
-            TypeMapper = typeMapper;
+            _typeMapper = typeMapper;
         }
 
         public virtual SelectExpression SelectExpression => _selectExpression;
 
-        public virtual IRelationalTypeMapper TypeMapper { get; }
 
-        public virtual IReadOnlyList<CommandParameter> Parameters => _commandParameters;
-
-        protected virtual string ParameterPrefix => "@";
-
-        public virtual string GenerateSql(IDictionary<string, object> parameterValues)
-        {
-            Check.NotNull(parameterValues, nameof(parameterValues));
-
-            _commandParameters.Clear();
-
-            var substitutions = new object[_inputParameters.Length];
-
-            for (var index = 0; index < _inputParameters.Length; index++)
-            {
-                var parameterName = ParameterPrefix + "p" + index;
-
-                var value = _inputParameters[index];
-                _commandParameters.Add(new CommandParameter(parameterName, value, TypeMapper.GetDefaultMapping(value)));
-
-                substitutions[index] = parameterName;
-            }
-
-            return string.Format(_sql, substitutions);
-        }
+        public virtual RelationalCommand GenerateCommand([NotNull] IDictionary<string, object> parameterValues)
+            => new RelationalCommandBuilder(_typeMapper)
+                .AppendFormat(_sql, _inputParameters)
+                .RelationalCommand;
 
         public virtual IRelationalValueBufferFactory CreateValueBufferFactory(
             IRelationalValueBufferFactoryFactory relationalValueBufferFactoryFactory, DbDataReader dataReader)

@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using JetBrains.Annotations;
 using Microsoft.Data.Entity.Infrastructure;
 using Microsoft.Data.Entity.Storage;
+using Microsoft.Data.Entity.Storage.Commands;
 using Microsoft.Data.Sqlite;
 using Microsoft.Framework.Logging;
 
@@ -49,11 +50,9 @@ namespace Microsoft.Data.Entity.Sqlite
             {
                 return;
             }
-            using (var command = DbConnection.CreateCommand())
-            {
-                command.CommandText = "PRAGMA foreign_keys=ON;";
-                command.ExecuteNonQuery();
-            }
+
+            var command = new RelationalCommand("PRAGMA foreign_keys=ON;");
+            command.CreateDbCommand(this).ExecuteNonQuery();
         }
     }
 }

@@ -9,8 +9,10 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using JetBrains.Annotations;
 using Microsoft.Data.Entity.Infrastructure;
 using Microsoft.Data.Entity.Storage;
+using Microsoft.Data.Entity.Storage.Commands;
 using Microsoft.Data.Entity.Tests;
 using Microsoft.Framework.DependencyInjection;
 using Microsoft.Framework.Logging;
@@ -157,11 +159,11 @@ namespace Microsoft.Data.Entity.SqlServer.Tests
             {
             }
 
-            public override void ExecuteNonQuery(IRelationalConnection connection, DbTransaction transaction, IEnumerable<SqlBatch> sqlBatches)
+            public override void ExecuteNonQuery(IRelationalConnection connection, IEnumerable<RelationalCommand> relationalCommands)
             {
             }
 
-            public override Task ExecuteNonQueryAsync(IRelationalConnection connection, DbTransaction transaction, IEnumerable<SqlBatch> sqlBatches, CancellationToken cancellationToken = new CancellationToken())
+            public override Task ExecuteNonQueryAsync(IRelationalConnection connection, IEnumerable<RelationalCommand> relationalCommands, CancellationToken cancellationToken = default(CancellationToken))
             {
                 return Task.FromResult(0);
             }

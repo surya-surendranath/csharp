@@ -102,7 +102,7 @@ namespace Microsoft.Data.Entity.Query
 
         public virtual IRelationalTypeMapper TypeMapper { get; }
 
-        public virtual ISqlQueryGenerator CreateSqlQueryGenerator([NotNull] SelectExpression selectExpression)
+        public virtual IQueryCommandGenerator CreateQueryCommandGenerator([NotNull] SelectExpression selectExpression)
         {
             Check.NotNull(selectExpression, nameof(selectExpression));
 

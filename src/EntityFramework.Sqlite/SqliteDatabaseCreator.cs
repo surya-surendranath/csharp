@@ -47,7 +47,7 @@ namespace Microsoft.Data.Entity.Sqlite
         {
             var operations = _modelDiffer.GetDifferences(null, Model);
             var statements = _migrationSqlGenerator.Generate(operations, Model);
-            _executor.ExecuteNonQuery(_connection, null, statements);
+            _executor.ExecuteNonQuery(_connection, statements);
         }
 
         public override bool Exists() => true;
@@ -56,7 +56,6 @@ namespace Microsoft.Data.Entity.Sqlite
         {
             var count = (long)_executor.ExecuteScalar(
                 _connection,
-                null,
                 "SELECT COUNT(*) FROM \"sqlite_master\" WHERE \"type\" = 'table' AND \"rootpage\" IS NOT NULL;");
 
             return count != 0;

@@ -233,7 +233,7 @@ namespace Microsoft.Data.Entity.Query.ExpressionVisitors
                                     EntityQueryModelVisitor.QueryContextParameter,
                                     Expression.Constant(
                                         new CommandBuilder(
-                                            () => _queryCompilationContext.CreateSqlQueryGenerator(targetSelectExpression),
+                                            () => _queryCompilationContext.CreateQueryCommandGenerator(targetSelectExpression),
                                             _queryCompilationContext.ValueBufferFactoryFactory))),
                                 materializer));
                 }

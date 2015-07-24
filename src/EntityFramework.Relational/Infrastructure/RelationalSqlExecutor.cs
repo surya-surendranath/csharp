@@ -1,18 +1,18 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
-using System.Collections.Generic;
 using JetBrains.Annotations;
-using Microsoft.Data.Entity.Query;
 using Microsoft.Data.Entity.Storage;
+using Microsoft.Data.Entity.Storage.Commands;
+using Microsoft.Data.Entity.Utilities;
 
 namespace Microsoft.Data.Entity.Infrastructure
 {
     public class RelationalSqlExecutor
     {
-        private ISqlStatementExecutor _statementExecutor;
-        private IRelationalConnection _connection;
-        private IRelationalTypeMapper _typeMapper;
+        private readonly ISqlStatementExecutor _statementExecutor;
+        private readonly IRelationalConnection _connection;
+        private readonly IRelationalTypeMapper _typeMapper;
 
         public RelationalSqlExecutor(
             [NotNull] ISqlStatementExecutor statementExecutor,
@@ -26,30 +26,14 @@ namespace Microsoft.Data.Entity.Infrastructure
 
         public virtual void ExecuteSqlCommand([NotNull] string sql, [NotNull] params object[] parameters)
         {
-            var commandParameters = new CommandParameter[parameters.Length];
-            var substitutions = new object[parameters.Length];
+            Check.NotNull(sql, nameof(sql));
+            Check.NotNull(parameters, nameof(parameters));
 
-            for (var index = 0; index < parameters.Length; index++)
-            {
-                var parameterName = ParameterPrefix + "p" + index;
+            var builder = new RelationalCommandBuilder(_typeMapper);
 
-                var value = parameters[index];
+            builder.AppendFormat(sql, parameters);
 
-                commandParameters[index] = new CommandParameter(parameterName, value, _typeMapper.GetDefaultMapping(value));
-
-                substitutions[index] = parameterName;
-            }
-
-            _statementExecutor.ExecuteNonQuery(
-                _connection,
-                _connection.Transaction?.DbTransaction,
-                new List<SqlBatch> {
-                    new SqlBatch(
-                        string.Format(sql, substitutions),
-                        commandParameters)
-                });
+            _statementExecutor.ExecuteNonQuery(_connection, builder.RelationalCommand);
         }
-
-        protected virtual string ParameterPrefix => "@";
     }
 }

@@ -15,24 +15,24 @@ namespace Microsoft.Data.Entity.Query
     public class CommandBuilder
     {
         private readonly IRelationalValueBufferFactoryFactory _valueBufferFactoryFactory;
-        private readonly Func<ISqlQueryGenerator> _sqlGeneratorFactory;
+        private readonly Func<IQueryCommandGenerator> _commandGeneratorFactory;
 
         private IRelationalValueBufferFactory _valueBufferFactory;
 
         public CommandBuilder(
-            [NotNull] Func<ISqlQueryGenerator> sqlGeneratorFactory,
+            [NotNull] Func<IQueryCommandGenerator> commandGeneratorFactory,
             [NotNull] IRelationalValueBufferFactoryFactory valueBufferFactoryFactory)
         {
-            Check.NotNull(sqlGeneratorFactory, nameof(sqlGeneratorFactory));
+            Check.NotNull(commandGeneratorFactory, nameof(commandGeneratorFactory));
             Check.NotNull(valueBufferFactoryFactory, nameof(valueBufferFactoryFactory));
 
-            _sqlGeneratorFactory = sqlGeneratorFactory;
+            _commandGeneratorFactory = commandGeneratorFactory;
             _valueBufferFactoryFactory = valueBufferFactoryFactory;
         }
 
         public virtual IRelationalValueBufferFactory ValueBufferFactory => _valueBufferFactory;
 
-        public virtual Func<ISqlQueryGenerator> SqlGeneratorFactory => _sqlGeneratorFactory;
+        public virtual Func<IQueryCommandGenerator> CommandGeneratorFactory => _commandGeneratorFactory;
 
         public virtual DbCommand Build(
             [NotNull] IRelationalConnection connection,
@@ -40,34 +40,9 @@ namespace Microsoft.Data.Entity.Query
         {
             Check.NotNull(connection, nameof(connection));
 
-            // TODO: Cache command...
-
-            var command = connection.DbConnection.CreateCommand();
-
-            if (connection.Transaction != null)
-            {
-                command.Transaction = connection.Transaction.DbTransaction;
-            }
-
-            if (connection.CommandTimeout != null)
-            {
-                command.CommandTimeout = (int)connection.CommandTimeout;
-            }
-
-            var sqlQueryGenerator = _sqlGeneratorFactory();
-
-            command.CommandText = sqlQueryGenerator.GenerateSql(parameterValues);
-
-            foreach (var commandParameter in sqlQueryGenerator.Parameters)
-            {
-                command.Parameters.Add(
-                    commandParameter.TypeMapping.CreateParameter(
-                        command,
-                        commandParameter.Name,
-                        commandParameter.Value));
-            }
-
-            return command;
+            return _commandGeneratorFactory()
+                .GenerateCommand(parameterValues)
+                .CreateDbCommand(connection);
         }
 
         public virtual void NotifyReaderCreated([NotNull] DbDataReader dataReader)
@@ -77,7 +52,7 @@ namespace Microsoft.Data.Entity.Query
             LazyInitializer
                 .EnsureInitialized(
                     ref _valueBufferFactory,
-                    () => _sqlGeneratorFactory()
+                    () => _commandGeneratorFactory()
                         .CreateValueBufferFactory(_valueBufferFactoryFactory, dataReader));
         }
     }

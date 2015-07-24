@@ -29,7 +29,7 @@ namespace Microsoft.Data.Entity.SqlServer.Query
 
             if (countExpression.Type == typeof(long))
             {
-                Sql.Append("COUNT_BIG(*)");
+                CommandBuilder.Append("COUNT_BIG(*)");
 
                 return countExpression;
             }
@@ -42,7 +42,7 @@ namespace Microsoft.Data.Entity.SqlServer.Query
             if (selectExpression.Offset != null
                 && !selectExpression.OrderBy.Any())
             {
-                Sql.AppendLine().Append("ORDER BY @@ROWCOUNT");
+                CommandBuilder.AppendLine().Append("ORDER BY @@ROWCOUNT");
             }
 
             base.GenerateLimitOffset(selectExpression);

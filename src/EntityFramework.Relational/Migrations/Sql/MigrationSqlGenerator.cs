@@ -10,6 +10,7 @@ using Microsoft.Data.Entity.Metadata;
 using Microsoft.Data.Entity.Migrations.Operations;
 using Microsoft.Data.Entity.Relational.Internal;
 using Microsoft.Data.Entity.Storage;
+using Microsoft.Data.Entity.Storage.Commands;
 using Microsoft.Data.Entity.Update;
 using Microsoft.Data.Entity.Utilities;
 
@@ -35,13 +36,13 @@ namespace Microsoft.Data.Entity.Migrations.Sql
             _annotations = annotations;
         }
 
-        public virtual IReadOnlyList<SqlBatch> Generate(
+        public virtual IReadOnlyList<RelationalCommand> Generate(
             IReadOnlyList<MigrationOperation> operations,
             IModel model = null)
         {
             Check.NotNull(operations, nameof(operations));
 
-            var builder = new SqlBatchBuilder();
+            var builder = new SqlBatchBuilder(_typeMapper);
             foreach (var operation in operations)
             {
                 // TODO: Too magic?
@@ -51,7 +52,7 @@ namespace Microsoft.Data.Entity.Migrations.Sql
 
             builder.EndBatch();
 
-            return builder.SqlBatches;
+            return builder.RelationalCommands;
         }
 
         public virtual void Generate(
@@ -399,7 +400,7 @@ namespace Microsoft.Data.Entity.Migrations.Sql
             Check.NotNull(operation, nameof(operation));
             Check.NotNull(builder, nameof(builder));
 
-            builder.Append(operation.Sql, operation.SuppressTransaction);
+            builder.Append(operation.Sql);
         }
 
         public virtual void SequenceOptions(

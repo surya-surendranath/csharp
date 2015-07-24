@@ -11,24 +11,23 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
 using JetBrains.Annotations;
-using Microsoft.Data.Entity.Internal;
 using Microsoft.Data.Entity.Query.Expressions;
 using Microsoft.Data.Entity.Query.ExpressionVisitors;
 using Microsoft.Data.Entity.Storage;
+using Microsoft.Data.Entity.Storage.Commands;
 using Microsoft.Data.Entity.Utilities;
 using Remotion.Linq.Clauses;
 using Remotion.Linq.Parsing;
 
 namespace Microsoft.Data.Entity.Query.Sql
 {
-    public class DefaultQuerySqlGenerator : ThrowingExpressionVisitor, ISqlExpressionVisitor, ISqlQueryGenerator
+    public class DefaultQuerySqlGenerator : ThrowingExpressionVisitor, ISqlExpressionVisitor, IQueryCommandGenerator
     {
         private readonly SelectExpression _selectExpression;
+        private readonly IRelationalTypeMapper _typeMapper;
 
-        private IndentedStringBuilder _sql;
-        private List<CommandParameter> _commandParameters;
+        private RelationalCommandBuilder _commandBuilder;
         private IDictionary<string, object> _parameterValues;
-        private int _rawSqlParameterIndex;
 
         public DefaultQuerySqlGenerator(
             [NotNull] SelectExpression selectExpression,
@@ -37,25 +36,21 @@ namespace Microsoft.Data.Entity.Query.Sql
             Check.NotNull(selectExpression, nameof(selectExpression));
 
             _selectExpression = selectExpression;
-            TypeMapper = typeMapper;
+            _typeMapper = typeMapper;
         }
-
-        public virtual IRelationalTypeMapper TypeMapper { get; }
 
         public virtual SelectExpression SelectExpression => _selectExpression;
 
-        public virtual string GenerateSql(IDictionary<string, object> parameterValues)
+        public virtual RelationalCommand GenerateCommand([NotNull] IDictionary<string, object> parameterValues)
         {
             Check.NotNull(parameterValues, nameof(parameterValues));
 
-            _sql = new IndentedStringBuilder();
-            _commandParameters = new List<CommandParameter>();
+            _commandBuilder = new RelationalCommandBuilder(_typeMapper);
             _parameterValues = parameterValues;
-            _rawSqlParameterIndex = 0;
 
             Visit(_selectExpression);
 
-            return _sql.ToString();
+            return _commandBuilder.RelationalCommand;
         }
 
         public virtual IRelationalValueBufferFactory CreateValueBufferFactory(
@@ -67,12 +62,10 @@ namespace Microsoft.Data.Entity.Query.Sql
                 .Create(_selectExpression.GetProjectionTypes().ToArray(), indexMap: null);
         }
 
-        public virtual IReadOnlyList<CommandParameter> Parameters => _commandParameters;
-
-        protected virtual IndentedStringBuilder Sql => _sql;
+        protected virtual RelationalCommandBuilder CommandBuilder => _commandBuilder;
 
         protected virtual string ConcatOperator => "+";
-        protected virtual string ParameterPrefix => "@";
+
         protected virtual string TrueLiteral => "1";
         protected virtual string FalseLiteral => "0";
         protected virtual string TypedTrueLiteral => "CAST(1 AS BIT)";
@@ -86,16 +79,16 @@ namespace Microsoft.Data.Entity.Query.Sql
 
             if (selectExpression.Alias != null)
             {
-                _sql.AppendLine("(");
+                CommandBuilder.AppendLine("(");
 
-                subQueryIndent = _sql.Indent();
+                subQueryIndent = CommandBuilder.Indent();
             }
 
-            _sql.Append("SELECT ");
+            CommandBuilder.Append("SELECT ");
 
             if (selectExpression.IsDistinct)
             {
-                _sql.Append("DISTINCT ");
+                CommandBuilder.Append("DISTINCT ");
             }
 
             GenerateTop(selectExpression);
@@ -106,17 +99,17 @@ namespace Microsoft.Data.Entity.Query.Sql
             }
             else if (selectExpression.IsProjectStar)
             {
-                _sql.Append(DelimitIdentifier(selectExpression.Tables.Single().Alias))
+                CommandBuilder.Append(DelimitIdentifier(selectExpression.Tables.Single().Alias))
                     .Append(".*");
             }
             else
             {
-                _sql.Append("1");
+                CommandBuilder.Append("1");
             }
 
             if (selectExpression.Tables.Any())
             {
-                _sql.AppendLine()
+                CommandBuilder.AppendLine()
                     .Append("FROM ");
 
                 VisitJoin(selectExpression.Tables, sql => sql.AppendLine());
@@ -124,14 +117,14 @@ namespace Microsoft.Data.Entity.Query.Sql
 
             if (selectExpression.Predicate != null)
             {
-                _sql.AppendLine()
+                CommandBuilder.AppendLine()
                     .Append("WHERE ");
 
                 var constantExpression = selectExpression.Predicate as ConstantExpression;
 
                 if (constantExpression != null)
                 {
-                    _sql.Append((bool)constantExpression.Value ? "1 = 1" : "1 = 0");
+                    CommandBuilder.Append((bool)constantExpression.Value ? "1 = 1" : "1 = 0");
                 }
                 else
                 {
@@ -163,15 +156,15 @@ namespace Microsoft.Data.Entity.Query.Sql
                         || selectExpression.Predicate.IsAliasWithColumnExpression()
                         || selectExpression.Predicate is SelectExpression)
                     {
-                        _sql.Append(" = ");
-                        _sql.Append(TrueLiteral);
+                        CommandBuilder.Append(" = ");
+                        CommandBuilder.Append(TrueLiteral);
                     }
                 }
             }
 
             if (selectExpression.OrderBy.Any())
             {
-                _sql.AppendLine()
+                CommandBuilder.AppendLine()
                     .Append("ORDER BY ");
 
                 VisitJoin(selectExpression.OrderBy, t =>
@@ -186,11 +179,11 @@ namespace Microsoft.Data.Entity.Query.Sql
 
                                 if (columnExpression != null)
                                 {
-                                    _sql.Append(DelimitIdentifier(columnExpression.TableAlias))
+                                    CommandBuilder.Append(DelimitIdentifier(columnExpression.TableAlias))
                                         .Append(".");
                                 }
 
-                                _sql.Append(DelimitIdentifier(aliasExpression.Alias));
+                                CommandBuilder.Append(DelimitIdentifier(aliasExpression.Alias));
                             }
                             else
                             {
@@ -204,7 +197,7 @@ namespace Microsoft.Data.Entity.Query.Sql
 
                         if (t.OrderingDirection == OrderingDirection.Desc)
                         {
-                            _sql.Append(" DESC");
+                            CommandBuilder.Append(" DESC");
                         }
                     });
             }
@@ -215,12 +208,12 @@ namespace Microsoft.Data.Entity.Query.Sql
             {
                 subQueryIndent.Dispose();
 
-                _sql.AppendLine()
+                CommandBuilder.AppendLine()
                     .Append(")");
 
                 if (selectExpression.Alias.Length > 0)
                 {
-                    _sql.Append(" AS ")
+                    CommandBuilder.Append(" AS ")
                         .Append(DelimitIdentifier(selectExpression.Alias));
                 }
             }
@@ -229,11 +222,11 @@ namespace Microsoft.Data.Entity.Query.Sql
         }
 
         private void VisitJoin(
-            IReadOnlyList<Expression> expressions, Action<IndentedStringBuilder> joinAction = null)
+            IReadOnlyList<Expression> expressions, Action<RelationalCommandBuilder> joinAction = null)
             => VisitJoin(expressions, e => Visit(e), joinAction);
 
         private void VisitJoin<T>(
-            IReadOnlyList<T> items, Action<T> itemAction, Action<IndentedStringBuilder> joinAction = null)
+            IReadOnlyList<T> items, Action<T> itemAction, Action<RelationalCommandBuilder> joinAction = null)
         {
             joinAction = joinAction ?? (isb => isb.Append(", "));
 
@@ -241,7 +234,7 @@ namespace Microsoft.Data.Entity.Query.Sql
             {
                 if (i > 0)
                 {
-                    joinAction(_sql);
+                    joinAction(CommandBuilder);
                 }
 
                 itemAction(items[i]);
@@ -252,29 +245,17 @@ namespace Microsoft.Data.Entity.Query.Sql
         {
             Check.NotNull(rawSqlDerivedTableExpression, nameof(rawSqlDerivedTableExpression));
 
-            _sql.AppendLine("(");
+            CommandBuilder.AppendLine("(");
 
-            using (_sql.Indent())
+            using (CommandBuilder.Indent())
             {
-                var substitutions = new object[rawSqlDerivedTableExpression.Parameters.Count()];
 
-                for (var index = 0; index < rawSqlDerivedTableExpression.Parameters.Count(); index++)
-                {
-                    var parameterName = ParameterPrefix + "p" + _rawSqlParameterIndex++;
-                    var value = rawSqlDerivedTableExpression.Parameters[index];
-
-                    _commandParameters.Add(
-                        new CommandParameter(parameterName, value, TypeMapper.GetDefaultMapping(value)));
-
-                    substitutions[index] = parameterName;
-                }
-
-                _sql.AppendLines(string.Format(
+                CommandBuilder.AppendFormatLines(
                     rawSqlDerivedTableExpression.Sql,
-                    substitutions));
+                    rawSqlDerivedTableExpression.Parameters);
             }
 
-            _sql.Append(") AS ")
+            CommandBuilder.Append(") AS ")
                 .Append(DelimitIdentifier(rawSqlDerivedTableExpression.Alias));
 
             return rawSqlDerivedTableExpression;
@@ -286,11 +267,11 @@ namespace Microsoft.Data.Entity.Query.Sql
 
             if (tableExpression.Schema != null)
             {
-                _sql.Append(DelimitIdentifier(tableExpression.Schema))
+                CommandBuilder.Append(DelimitIdentifier(tableExpression.Schema))
                     .Append(".");
             }
 
-            _sql.Append(DelimitIdentifier(tableExpression.Table))
+            CommandBuilder.Append(DelimitIdentifier(tableExpression.Table))
                 .Append(" AS ")
                 .Append(DelimitIdentifier(tableExpression.Alias));
 
@@ -301,7 +282,7 @@ namespace Microsoft.Data.Entity.Query.Sql
         {
             Check.NotNull(crossJoinExpression, nameof(crossJoinExpression));
 
-            _sql.Append("CROSS JOIN ");
+            CommandBuilder.Append("CROSS JOIN ");
 
             Visit(crossJoinExpression.TableExpression);
 
@@ -312,7 +293,7 @@ namespace Microsoft.Data.Entity.Query.Sql
         {
             Check.NotNull(countExpression, nameof(countExpression));
 
-            _sql.Append("COUNT(*)");
+            CommandBuilder.Append("COUNT(*)");
 
             return countExpression;
         }
@@ -321,11 +302,11 @@ namespace Microsoft.Data.Entity.Query.Sql
         {
             Check.NotNull(sumExpression, nameof(sumExpression));
 
-            _sql.Append("SUM(");
+            CommandBuilder.Append("SUM(");
 
             Visit(sumExpression.Expression);
 
-            _sql.Append(")");
+            CommandBuilder.Append(")");
 
             return sumExpression;
         }
@@ -334,11 +315,11 @@ namespace Microsoft.Data.Entity.Query.Sql
         {
             Check.NotNull(minExpression, nameof(minExpression));
 
-            _sql.Append("MIN(");
+            CommandBuilder.Append("MIN(");
 
             Visit(minExpression.Expression);
 
-            _sql.Append(")");
+            CommandBuilder.Append(")");
 
             return minExpression;
         }
@@ -347,11 +328,11 @@ namespace Microsoft.Data.Entity.Query.Sql
         {
             Check.NotNull(maxExpression, nameof(maxExpression));
 
-            _sql.Append("MAX(");
+            CommandBuilder.Append("MAX(");
 
             Visit(maxExpression.Expression);
 
-            _sql.Append(")");
+            CommandBuilder.Append(")");
 
             return maxExpression;
         }
@@ -376,22 +357,22 @@ namespace Microsoft.Data.Entity.Query.Sql
                 {
                     Visit(inExpression.Operand);
 
-                    _sql.Append(" IN (");
+                    CommandBuilder.Append(" IN (");
 
                     VisitJoin(inValuesNotNull);
 
-                    _sql.Append(")");
+                    CommandBuilder.Append(")");
                 }
                 else
                 {
-                    _sql.Append("1 = 0");
+                    CommandBuilder.Append("1 = 0");
                 }
             }
             else
             {
                 Visit(inExpression.Operand);
 
-                _sql.Append(" IN ");
+                CommandBuilder.Append(" IN ");
 
                 Visit(inExpression.SubQuery);
             }
@@ -419,26 +400,26 @@ namespace Microsoft.Data.Entity.Query.Sql
                 {
                     Visit(inExpression.Operand);
 
-                    _sql.Append(" NOT IN (");
+                    CommandBuilder.Append(" NOT IN (");
 
                     VisitJoin(inValues);
 
-                    _sql.Append(")");
+                    CommandBuilder.Append(")");
                 }
                 else
                 {
-                    _sql.Append("1 = 1");
+                    CommandBuilder.Append("1 = 1");
                 }
             }
             else
             {
                 Visit(inExpression.Operand);
 
-                _sql.Append(" NOT IN ");
+                CommandBuilder.Append(" NOT IN ");
 
                 Visit(inExpression.SubQuery);
             }
-            
+
             return inExpression;
         }
 
@@ -517,11 +498,11 @@ namespace Microsoft.Data.Entity.Query.Sql
         {
             Check.NotNull(innerJoinExpression, nameof(innerJoinExpression));
 
-            _sql.Append("INNER JOIN ");
+            CommandBuilder.Append("INNER JOIN ");
 
             Visit(innerJoinExpression.TableExpression);
 
-            _sql.Append(" ON ");
+            CommandBuilder.Append(" ON ");
 
             Visit(innerJoinExpression.Predicate);
 
@@ -532,11 +513,11 @@ namespace Microsoft.Data.Entity.Query.Sql
         {
             Check.NotNull(leftOuterJoinExpression, nameof(leftOuterJoinExpression));
 
-            _sql.Append("LEFT JOIN ");
+            CommandBuilder.Append("LEFT JOIN ");
 
             Visit(leftOuterJoinExpression.TableExpression);
 
-            _sql.Append(" ON ");
+            CommandBuilder.Append(" ON ");
 
             Visit(leftOuterJoinExpression.Predicate);
 
@@ -550,7 +531,7 @@ namespace Microsoft.Data.Entity.Query.Sql
             if (selectExpression.Limit != null
                 && selectExpression.Offset == null)
             {
-                _sql.Append("TOP(")
+                CommandBuilder.Append("TOP(")
                     .Append(selectExpression.Limit)
                     .Append(") ");
             }
@@ -562,14 +543,14 @@ namespace Microsoft.Data.Entity.Query.Sql
 
             if (selectExpression.Offset != null)
             {
-                _sql.AppendLine()
+                CommandBuilder.AppendLine()
                     .Append("OFFSET ")
                     .Append(selectExpression.Offset)
                     .Append(" ROWS");
 
                 if (selectExpression.Limit != null)
                 {
-                    _sql.Append(" FETCH NEXT ")
+                    CommandBuilder.Append(" FETCH NEXT ")
                         .Append(selectExpression.Limit)
                         .Append(" ROWS ONLY");
                 }
@@ -580,53 +561,53 @@ namespace Microsoft.Data.Entity.Query.Sql
         {
             Check.NotNull(expression, nameof(expression));
 
-            _sql.AppendLine("CASE");
+            CommandBuilder.AppendLine("CASE");
 
-            using (_sql.Indent())
+            using (CommandBuilder.Indent())
             {
-                _sql.AppendLine("WHEN");
+                CommandBuilder.AppendLine("WHEN");
 
-                using (_sql.Indent())
+                using (CommandBuilder.Indent())
                 {
-                    _sql.Append("(");
+                    CommandBuilder.Append("(");
 
                     Visit(expression.Test);
 
-                    _sql.AppendLine(")");
+                    CommandBuilder.AppendLine(")");
                 }
 
-                _sql.Append("THEN ");
+                CommandBuilder.Append("THEN ");
 
                 var constantIfTrue = expression.IfTrue as ConstantExpression;
 
                 if (constantIfTrue != null
                     && constantIfTrue.Type == typeof(bool))
                 {
-                    _sql.Append((bool)constantIfTrue.Value ? TypedTrueLiteral : TypedFalseLiteral);
+                    CommandBuilder.Append((bool)constantIfTrue.Value ? TypedTrueLiteral : TypedFalseLiteral);
                 }
                 else
                 {
                     Visit(expression.IfTrue);
                 }
 
-                _sql.Append(" ELSE ");
+                CommandBuilder.Append(" ELSE ");
 
                 var constantIfFalse = expression.IfFalse as ConstantExpression;
 
                 if (constantIfFalse != null
                     && constantIfFalse.Type == typeof(bool))
                 {
-                    _sql.Append((bool)constantIfFalse.Value ? TypedTrueLiteral : TypedFalseLiteral);
+                    CommandBuilder.Append((bool)constantIfFalse.Value ? TypedTrueLiteral : TypedFalseLiteral);
                 }
                 else
                 {
                     Visit(expression.IfFalse);
                 }
 
-                _sql.AppendLine();
+                CommandBuilder.AppendLine();
             }
 
-            _sql.Append("END");
+            CommandBuilder.Append("END");
 
             return expression;
         }
@@ -635,14 +616,14 @@ namespace Microsoft.Data.Entity.Query.Sql
         {
             Check.NotNull(existsExpression, nameof(existsExpression));
 
-            _sql.AppendLine("EXISTS (");
+            CommandBuilder.AppendLine("EXISTS (");
 
-            using (_sql.Indent())
+            using (CommandBuilder.Indent())
             {
                 Visit(existsExpression.Expression);
             }
 
-            _sql.AppendLine(")");
+            CommandBuilder.AppendLine(")");
 
             return existsExpression;
         }
@@ -653,11 +634,11 @@ namespace Microsoft.Data.Entity.Query.Sql
 
             if (binaryExpression.NodeType == ExpressionType.Coalesce)
             {
-                _sql.Append("COALESCE(");
+                CommandBuilder.Append("COALESCE(");
                 Visit(binaryExpression.Left);
-                _sql.Append(", ");
+                CommandBuilder.Append(", ");
                 Visit(binaryExpression.Right);
-                _sql.Append(")");
+                CommandBuilder.Append(")");
             }
             else
             {
@@ -668,7 +649,7 @@ namespace Microsoft.Data.Entity.Query.Sql
 
                 if (needParentheses)
                 {
-                    _sql.Append("(");
+                    CommandBuilder.Append("(");
                 }
 
                 Visit(binaryExpression.Left);
@@ -676,8 +657,8 @@ namespace Microsoft.Data.Entity.Query.Sql
                 if (binaryExpression.IsLogicalOperation()
                     && binaryExpression.Left.IsSimpleExpression())
                 {
-                    _sql.Append(" = ");
-                    _sql.Append(TrueLiteral);
+                    CommandBuilder.Append(" = ");
+                    CommandBuilder.Append(TrueLiteral);
                 }
 
                 string op;
@@ -727,20 +708,20 @@ namespace Microsoft.Data.Entity.Query.Sql
                         throw new ArgumentOutOfRangeException();
                 }
 
-                _sql.Append(op);
+                CommandBuilder.Append(op);
 
                 Visit(binaryExpression.Right);
 
                 if (binaryExpression.IsLogicalOperation()
                     && binaryExpression.Right.IsSimpleExpression())
                 {
-                    _sql.Append(" = ");
-                    _sql.Append(TrueLiteral);
+                    CommandBuilder.Append(" = ");
+                    CommandBuilder.Append(TrueLiteral);
                 }
 
                 if (needParentheses)
                 {
-                    _sql.Append(")");
+                    CommandBuilder.Append(")");
                 }
             }
 
@@ -751,7 +732,7 @@ namespace Microsoft.Data.Entity.Query.Sql
         {
             Check.NotNull(columnExpression, nameof(columnExpression));
 
-            _sql.Append(DelimitIdentifier(columnExpression.TableAlias))
+            CommandBuilder.Append(DelimitIdentifier(columnExpression.TableAlias))
                 .Append(".")
                 .Append(DelimitIdentifier(columnExpression.Name));
 
@@ -768,13 +749,13 @@ namespace Microsoft.Data.Entity.Query.Sql
 
                 if (aliasExpression.Alias != null)
                 {
-                    _sql.Append(" AS ");
+                    CommandBuilder.Append(" AS ");
                 }
             }
 
             if (aliasExpression.Alias != null)
             {
-                _sql.Append(DelimitIdentifier(aliasExpression.Alias));
+                CommandBuilder.Append(DelimitIdentifier(aliasExpression.Alias));
             }
 
             return aliasExpression;
@@ -786,7 +767,7 @@ namespace Microsoft.Data.Entity.Query.Sql
 
             Visit(isNullExpression.Operand);
 
-            _sql.Append(" IS NULL");
+            CommandBuilder.Append(" IS NULL");
 
             return isNullExpression;
         }
@@ -797,7 +778,7 @@ namespace Microsoft.Data.Entity.Query.Sql
 
             Visit(isNotNullExpression.Operand);
 
-            _sql.Append(" IS NOT NULL");
+            CommandBuilder.Append(" IS NOT NULL");
 
             return isNotNullExpression;
         }
@@ -808,7 +789,7 @@ namespace Microsoft.Data.Entity.Query.Sql
 
             Visit(likeExpression.Match);
 
-            _sql.Append(" LIKE ");
+            CommandBuilder.Append(" LIKE ");
 
             Visit(likeExpression.Pattern);
 
@@ -819,19 +800,19 @@ namespace Microsoft.Data.Entity.Query.Sql
         {
             Check.NotNull(literalExpression, nameof(literalExpression));
 
-            _sql.Append(GenerateLiteral(literalExpression.Literal));
+            CommandBuilder.Append(GenerateLiteral(literalExpression.Literal));
 
             return literalExpression;
         }
 
         public virtual Expression VisitSqlFunction(SqlFunctionExpression sqlFunctionExpression)
         {
-            _sql.Append(sqlFunctionExpression.FunctionName);
-            _sql.Append("(");
+            CommandBuilder.Append(sqlFunctionExpression.FunctionName);
+            CommandBuilder.Append("(");
 
             VisitJoin(sqlFunctionExpression.Arguments.ToList());
 
-            _sql.Append(")");
+            CommandBuilder.Append(")");
 
             return sqlFunctionExpression;
         }
@@ -861,15 +842,15 @@ namespace Microsoft.Data.Entity.Query.Sql
 
                 if (!isColumnOrParameterOperand)
                 {
-                    _sql.Append("NOT (");
+                    CommandBuilder.Append("NOT (");
                     Visit(unaryExpression.Operand);
-                    _sql.Append(")");
+                    CommandBuilder.Append(")");
                 }
                 else
                 {
                     Visit(unaryExpression.Operand);
-                    _sql.Append(" = ");
-                    _sql.Append(FalseLiteral);
+                    CommandBuilder.Append(" = ");
+                    CommandBuilder.Append(FalseLiteral);
                 }
 
                 return unaryExpression;
@@ -889,7 +870,7 @@ namespace Microsoft.Data.Entity.Query.Sql
         {
             Check.NotNull(constantExpression, nameof(constantExpression));
 
-            _sql.Append(constantExpression.Value == null
+            CommandBuilder.Append(constantExpression.Value == null
                 ? "NULL"
                 : GenerateLiteral((dynamic)constantExpression.Value));
 
@@ -900,30 +881,17 @@ namespace Microsoft.Data.Entity.Query.Sql
         {
             Check.NotNull(parameterExpression, nameof(parameterExpression));
 
-            var parameterName = ParameterPrefix + GenerateParameterName(parameterExpression.Name);
-
-            _sql.Append(parameterName);
-
-            if (_commandParameters.All(commandParameter => commandParameter.Name != parameterName))
+            object value;
+            if (!_parameterValues.TryGetValue(parameterExpression.Name, out value))
             {
-                object value;
-                if (!_parameterValues.TryGetValue(parameterExpression.Name, out value))
-                {
-                    value = string.Empty;
-                }
-
-
-                _commandParameters.Add(new CommandParameter(parameterName, value, TypeMapper.GetDefaultMapping(value)));
+                value = string.Empty;
             }
 
+            CommandBuilder.AppendNamedParameter(
+                parameterExpression.Name,
+                value);
+
             return parameterExpression;
-        }
-
-        protected virtual string GenerateParameterName([NotNull] string parameterName)
-        {
-            Check.NotEmpty(parameterName, nameof(parameterName));
-
-            return parameterName;
         }
 
         protected override Exception CreateUnhandledItemException<T>(T unhandledItem, string visitMethod)
