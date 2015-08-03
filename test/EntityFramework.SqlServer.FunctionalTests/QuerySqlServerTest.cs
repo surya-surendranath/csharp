@@ -2,7 +2,9 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using Microsoft.Data.Entity.FunctionalTests;
 using Microsoft.Data.Entity.FunctionalTests.TestModels.Northwind;
 using Xunit;
@@ -3006,6 +3008,34 @@ WHERE (LOWER([c].[CustomerID]) = 'alfki')",
                 @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
 FROM [Customers] AS [c]
 WHERE (UPPER([c].[CustomerID]) = 'ALFKI')",
+                Sql);
+        }
+
+        private static Dictionary<Type, Dictionary<Type, string>> ConvertStrings = new Dictionary<Type, Dictionary<Type, string>>
+        {
+            {
+                typeof(byte), new Dictionary<Type, string>
+                {
+                    { typeof(byte), @"SELECT [o].[OrderID], [o].[CustomerID], [o].[EmployeeID], [o].[OrderDate]
+FROM [Orders] AS [o]
+WHERE ([o].[CustomerID] = 'ALFKI' AND (CONVERT(tinyint, CONVERT(tinyint, [o].[OrderID] % 1)) >= 0))" },
+                    { typeof(decimal), @"SELECT [o].[OrderID], [o].[CustomerID], [o].[EmployeeID], [o].[OrderDate]
+FROM [Orders] AS [o]
+WHERE ([o].[CustomerID] = 'ALFKI' AND (CONVERT(tinyint, CONVERT(decimal, [o].[OrderID] % 1)) >= 0))"}
+
+                }
+            }
+        };
+
+        public override void New_Convert_methods(
+            Type outer,
+            Type inner,
+            Expression<Func<Order, bool>> predicate)
+        {
+            base.New_Convert_methods(outer, inner, predicate);
+
+            Assert.Equal(
+                ConvertStrings[outer][inner],
                 Sql);
         }
 

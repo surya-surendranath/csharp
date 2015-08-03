@@ -3376,6 +3376,91 @@ namespace Microsoft.Data.Entity.FunctionalTests
                 entryCount: 91);
         }
 
+        public static TheoryData ConvertMethodData
+        {
+            get
+            {
+                return new TheoryData<Type, Type, Expression<Func<Order, bool>>> {
+                    { typeof(byte), typeof(byte), o => Convert.ToByte(Convert.ToByte(o.OrderID % 1)) >= 0 },
+                    { typeof(byte), typeof(decimal), o => Convert.ToByte(Convert.ToDecimal(o.OrderID % 1)) >= 0 },
+                    { typeof(byte), typeof(double), o => Convert.ToByte(Convert.ToDouble(o.OrderID % 1)) >= 0 },
+                    { typeof(byte), typeof(float), o => Convert.ToByte((float)Convert.ToDouble(o.OrderID % 1)) >= 0 },
+                    { typeof(byte), typeof(Int16), o => Convert.ToByte(Convert.ToInt16(o.OrderID % 1)) >= 0 },
+                    { typeof(byte), typeof(Int32), o => Convert.ToByte(Convert.ToInt32(o.OrderID % 1)) >= 0 },
+                    { typeof(byte), typeof(Int64), o => Convert.ToByte(Convert.ToInt64(o.OrderID % 1)) >= 0 },
+                    { typeof(byte), typeof(string), o => Convert.ToByte(Convert.ToString(o.OrderID % 1)) >= 0 },
+
+                    { typeof(decimal), typeof(byte), o => Convert.ToByte(Convert.ToByte(o.OrderID % 1)) >= 0 },
+                    { typeof(decimal), typeof(decimal), o => Convert.ToByte(Convert.ToDecimal(o.OrderID % 1)) >= 0 },
+                    { typeof(decimal), typeof(double), o => Convert.ToByte(Convert.ToDouble(o.OrderID % 1)) >= 0 },
+                    { typeof(decimal), typeof(float), o => Convert.ToByte((float)Convert.ToDouble(o.OrderID % 1)) >= 0 },
+                    { typeof(decimal), typeof(Int16), o => Convert.ToByte(Convert.ToInt16(o.OrderID % 1)) >= 0 },
+                    { typeof(decimal), typeof(Int32), o => Convert.ToByte(Convert.ToInt32(o.OrderID % 1)) >= 0 },
+                    { typeof(decimal), typeof(Int64), o => Convert.ToByte(Convert.ToInt64(o.OrderID % 1)) >= 0 },
+                    { typeof(decimal), typeof(string), o => Convert.ToByte(Convert.ToString(o.OrderID % 1)) >= 0 },
+
+                    { typeof(double), typeof(byte), o => Convert.ToDouble(Convert.ToByte(o.OrderID % 1)) >= 0 },
+                    { typeof(double), typeof(decimal), o => Convert.ToDouble(Convert.ToDecimal(o.OrderID % 1)) >= 0 },
+                    { typeof(double), typeof(double), o => Convert.ToDouble(Convert.ToDouble(o.OrderID % 1)) >= 0 },
+                    { typeof(double), typeof(float), o => Convert.ToDouble((float)Convert.ToDouble(o.OrderID % 1)) >= 0 },
+                    { typeof(double), typeof(Int16), o => Convert.ToDouble(Convert.ToInt16(o.OrderID % 1)) >= 0 },
+                    { typeof(double), typeof(Int32), o => Convert.ToDouble(Convert.ToInt32(o.OrderID % 1)) >= 0 },
+                    { typeof(double), typeof(Int64), o => Convert.ToDouble(Convert.ToInt64(o.OrderID % 1)) >= 0 },
+                    { typeof(double), typeof(string), o => Convert.ToDouble(Convert.ToString(o.OrderID % 1)) >= 0 },
+
+                    //{ typeof(Int16), typeof(byte),  },
+                    //{ typeof(Int16), typeof(decimal),  },
+                    //{ typeof(Int16), typeof(double),  },
+                    //{ typeof(Int16), typeof(float),  },
+                    //{ typeof(Int16), typeof(Int16),  },
+                    //{ typeof(Int16), typeof(Int32),  },
+                    //{ typeof(Int16), typeof(Int64),  },
+                    //{ typeof(Int16), typeof(string),  },
+
+                    //{ typeof(Int32), typeof(byte),  },
+                    //{ typeof(Int32), typeof(decimal),  },
+                    //{ typeof(Int32), typeof(double),  },
+                    //{ typeof(Int32), typeof(float),  },
+                    //{ typeof(Int32), typeof(Int16),  },
+                    //{ typeof(Int32), typeof(Int32),  },
+                    //{ typeof(Int32), typeof(Int64),  },
+                    //{ typeof(Int32), typeof(string),  },
+
+                    //{ typeof(Int64), typeof(byte),  },
+                    //{ typeof(Int64), typeof(decimal),  },
+                    //{ typeof(Int64), typeof(double),  },
+                    //{ typeof(Int64), typeof(float),  },
+                    //{ typeof(Int64), typeof(Int16),  },
+                    //{ typeof(Int64), typeof(Int32),  },
+                    //{ typeof(Int64), typeof(Int64),  },
+                    //{ typeof(Int64), typeof(string),  },
+
+                    //{ typeof(string), typeof(byte),  },
+                    //{ typeof(string), typeof(decimal),  },
+                    //{ typeof(string), typeof(double),  },
+                    //{ typeof(string), typeof(float),  },
+                    //{ typeof(string), typeof(Int16),  },
+                    //{ typeof(string), typeof(Int32),  },
+                    //{ typeof(string), typeof(Int64),  },
+                    //{ typeof(string), typeof(string),  },
+                };
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(ConvertMethodData))]
+        public virtual void New_Convert_methods(
+            Type outer,
+            Type inner,
+            Expression<Func<Order, bool>> predicate)
+        {
+            AssertQuery<Order>(
+                os => os.Where(o => o.CustomerID == "ALFKI")
+                .Where(predicate),
+            entryCount: 6);
+        }
+
+
         [Fact]
         public virtual void Convert_methods()
         {
