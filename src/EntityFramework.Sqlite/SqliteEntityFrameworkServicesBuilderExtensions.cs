@@ -3,6 +3,7 @@
 
 using JetBrains.Annotations;
 using Microsoft.Data.Entity.Infrastructure;
+using Microsoft.Data.Entity.Query;
 using Microsoft.Data.Entity.Sqlite;
 using Microsoft.Data.Entity.Sqlite.Metadata;
 using Microsoft.Data.Entity.Sqlite.Migrations;
@@ -37,15 +38,21 @@ namespace Microsoft.Framework.DependencyInjection
                     .AddSingleton<SqliteConventionSetBuilder>()
                     .AddScoped<SqliteModificationCommandBatchFactory>()
                     .AddScoped<SqliteDatabaseProviderServices>()
-                    .AddScoped<SqliteDatabase>()
                     .AddScoped<SqliteDatabaseConnection>()
                     .AddScoped<SqliteMigrationSqlGenerator>()
                     .AddScoped<SqliteDatabaseCreator>()
                     .AddScoped<SqliteHistoryRepository>()
                     .AddScoped<SqliteCompositeMethodCallTranslator>()
-                    .AddScoped<SqliteCompositeMemberTranslator>());
+                    .AddScoped<SqliteCompositeMemberTranslator>()
+                    .AddQuery());
 
             return services;
+        }
+
+        private static IServiceCollection AddQuery(this IServiceCollection serviceCollection)
+        {
+            return serviceCollection
+                .AddScoped<SqliteQueryCompilationContextFactory>();
         }
     }
 }

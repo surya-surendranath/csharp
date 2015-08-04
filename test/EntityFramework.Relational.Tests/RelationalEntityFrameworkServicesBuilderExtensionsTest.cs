@@ -32,6 +32,7 @@ namespace Microsoft.Data.Entity.Tests
 
             VerifyScoped<IMigrator>();
             VerifyScoped<IMigrationAssembly>();
+            VerifyScoped<RelationalDatabase>();
             VerifyScoped<RelationalQueryContextFactory>();
             VerifyScoped<BatchExecutor>();
             VerifyScoped<ModelDiffer>();

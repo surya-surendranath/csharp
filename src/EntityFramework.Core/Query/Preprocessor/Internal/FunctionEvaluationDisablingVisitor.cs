@@ -6,9 +6,10 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using Microsoft.Data.Entity.Query.Expressions;
+using Microsoft.Data.Entity.Query.ExpressionVisitors;
 using Remotion.Linq.Clauses.Expressions;
 
-namespace Microsoft.Data.Entity.Query.ExpressionVisitors
+namespace Microsoft.Data.Entity.Query.Preprocessor.Internal
 {
     public class FunctionEvaluationDisablingVisitor : ExpressionVisitorBase
     {

@@ -11,6 +11,8 @@ using Microsoft.Data.Entity.Metadata;
 using Microsoft.Data.Entity.Metadata.Conventions.Internal;
 using Microsoft.Data.Entity.Metadata.Internal;
 using Microsoft.Data.Entity.Query;
+using Microsoft.Data.Entity.Query.Compiler;
+using Microsoft.Data.Entity.Query.Preprocessor;
 using Microsoft.Data.Entity.Storage;
 using Microsoft.Data.Entity.ValueGeneration;
 using Microsoft.Framework.Caching.Memory;
@@ -35,6 +37,7 @@ namespace Microsoft.Data.Entity.Tests
         [Fact]
         public virtual void Services_wire_up_correctly()
         {
+            // Listeners
             VerifyScoped<IEntityStateListener>(isExistingReplaced: true);
             VerifyScoped<IForeignKeyListener>(isExistingReplaced: true);
             VerifyScoped<INavigationListener>(isExistingReplaced: true);
@@ -56,11 +59,9 @@ namespace Microsoft.Data.Entity.Tests
             VerifySingleton<IRelationshipsSnapshotFactory>();
             VerifySingleton<IStoreGeneratedValuesFactory>();
             VerifySingleton<IEntityEntryMetadataServices>();
-            VerifySingleton<ICompiledQueryCache>();
             VerifySingleton<ILoggerFactory>();
             VerifySingleton<ICoreConventionSetBuilder>();
             VerifySingleton<LoggingModelValidator>();
-            VerifySingleton<IMemoryCache>();
 
             VerifyScoped<IKeyPropagator>();
             VerifyScoped<INavigationFixer>();
@@ -69,7 +70,6 @@ namespace Microsoft.Data.Entity.Tests
             VerifyScoped<IInternalEntityEntryNotifier>();
             VerifyScoped<IInternalEntityEntrySubscriber>();
             VerifyScoped<IValueGenerationManager>();
-            VerifyScoped<IEntityQueryProvider>();
             VerifyScoped<IChangeTrackerFactory>();
             VerifyScoped<IChangeDetector>();
             VerifyScoped<IEntityEntryGraphIterator>();
@@ -82,7 +82,6 @@ namespace Microsoft.Data.Entity.Tests
             VerifyScoped<IDbContextOptions>();
             VerifyScoped<IDatabaseProviderServices>();
             VerifyScoped<IDatabase>();
-            VerifyScoped<IQueryContextFactory>();
             VerifyScoped<IValueGeneratorSelector>();
             VerifyScoped<IDatabaseCreator>();
             VerifyOptionalScoped<IConventionSetBuilder>();
@@ -90,6 +89,20 @@ namespace Microsoft.Data.Entity.Tests
             VerifyScoped<IModelSource>();
             VerifyScoped<IModelValidator>();
             VerifySingleton<IDatabaseProvider>(isExistingReplaced: true);
+
+            // Query
+            VerifySingleton<IMemoryCache>();
+            VerifySingleton<ICompiledQueryCache>();
+
+            VerifyScoped<IEntityQueryProvider>();
+            VerifyScoped<IQueryExecutor>();
+            VerifyScoped<IQueryPreprocessor>();
+            VerifyScoped<IQueryContextFactory>();
+            VerifyScoped<IQueryCompiler>();
+            VerifyScoped<QueryCompiler>();
+            VerifyScoped<IQueryCompilationContextFactory>();
+            VerifyScoped<ICompiledQueryCacheKeyGenerator>();
+            VerifyScoped<CompiledQueryCacheKeyGenerator>();
         }
 
         private readonly TestHelpers _testHelpers;
